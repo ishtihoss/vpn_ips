@@ -40,7 +40,8 @@ joined_df = df.join(df_app, on='bundle', how='left').cache()
 
 df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle like '%vpn%'" OR "app_name like '%vpn%'" OR "description like '%vpn%'")
 
-#Tokenize
+#Tokenize words in the description column to find how many times "vpn" occures
+# in the description
 
 df_v2 = df_v1.select('bundle',explode('description')).alias('word'))\
    .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
