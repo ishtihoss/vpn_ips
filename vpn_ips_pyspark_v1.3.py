@@ -43,8 +43,13 @@ df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle l
 #Tokenize words in the description column to find how many times "vpn" occures
 # in the description
 
-df_v2 = df_v1.select('bundle',explode('description')).alias('word'))\
-   .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
+df_v2 = df_v1.select('bundle',explode('description')).alias('word'))
+df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
+    .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
+
+# Tokenize app names
+
+
 
 
 # words(explode(col('words')).alias('word'))\
