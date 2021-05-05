@@ -19,6 +19,10 @@ df_app = df_app.select('app_name','bundle','description')
 df_app = df_app.withColumn("desc",F.lower(F.col("description")))
 df_app = df_app.withColumn("name",F.lower(F.col("app_name")))
 
+# Isolating apps with vpn connections
+
+df_app = df_app.select('bundle','name','desc').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
+
 
 # Count VPN appearance in app description
 
@@ -55,13 +59,13 @@ df = df.select('ip','bundle') # Add distinct later in EMR
 
 # Join app_description data and ip_addresses associated with these apps
 
-joined_df = df_app.join(df, on='bundle', how='left')
+joined_df = df_app.join(df, on='bundle', how='left').cache()
 
 # Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
 
-df_v1 = joined_df.select('ip','bundle','name','desc').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
 
-df_vX = df_v1.join(join_count, on='bundle', how='left')
+
+
 
 #Tokenize words in the description column to find how many times "vpn" occures
 # in the description
@@ -71,19 +75,16 @@ df_vX = df_v1.join(join_count, on='bundle', how='left')
 #df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('name'), ' '))).filter("name_word == 'vpn'").groupBy('name_word','bundle').count().sort('count', ascending=False)
 
 
-
-
-
-
-
 ## Adding tokenized words to data DataFrame
 
-df_v2 = df_v1.join(df_app_desc_wc,on='bundle',how ='left')
-df_v3 = df_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
+df_vx = joined_df.join(join_count, on='bundle', how='left')
+
+#df_v2 = df_v1.join(df_app_desc_wc,on='bundle',how ='left')
+#df_v3 = df_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
 
 ## Write file
 
-df_v3.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household_X1/')
+df_vx.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household_X3/')
 
 #df_v2 = df_v1.select('bundle',F.explode('description')).alias('word'))
 #df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
