@@ -12,6 +12,11 @@ from pyspark.sql.window import Window
 
 df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bundle/segment/monthly/all/all/').select('app_name','bundle','description').limit(100)
 
+# Lowercasing app names and app descriptions
+
+df_app = df_app.withColumn("desc",F.lower(F.col("description")))
+df_app = df_app.withColumn("name",F.lower(F.col("app_name")))
+
 # df_app.printSchema()
 #root
 # |-- app_name: string (nullable = true)
@@ -38,17 +43,16 @@ joined_df = df.join(df_app, on='bundle', how='left').cache()
 
 # Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
 
-df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle like '%vpn%' OR app_name like '%vpn%' OR description like '%vpn%'")
+df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
 
 #Tokenize words in the description column to find how many times "vpn" occures
 # in the description
 
 
-df_app_desc_wc = df_app.withColumn('desc_word', F.explode(F.split(F.col('description'), ' '))).groupBy('desc_word','bundle').count().sort('count', ascending=False)
-df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('description'), ' '))).groupBy('name_word','bundle').count().sort('count', ascending=False)
+df_app_desc_wc = df_app.withColumn('desc_word', F.explode(F.split(F.col('desc'), ' '))).filter("desc_word == 'vpn'").groupBy('desc_word','bundle').count().sort('count', ascending=False)
+df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('name'), ' '))).filter("name_word == 'vpn'").groupBy('name_word','bundle').count().sort('count', ascending=False)
 
 
-df_v2 = df_v1.join
 
 
 #df_v2 = df_v1.select('bundle',F.explode('description')).alias('word'))
