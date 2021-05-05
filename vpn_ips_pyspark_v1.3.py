@@ -10,7 +10,7 @@ from pyspark.sql.window import Window
 
 # Load data from app description folder
 
-df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bundle/segment/monthly/all/all/').select('app_name','bundle','description')
+df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bundle/segment/monthly/all/all/').select('app_name','bundle','description').limit(100)
 
 # df_app.printSchema()
 #root
@@ -30,7 +30,7 @@ df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bun
 # Load data from the raw etl folder (MY 202101, Month of January, 2021)
 
 path = 's3a://ada-prod-data/etl/data/brq/raw/eskimi/daily/MY/202101*'
-df = spark.read.format('parquet').load(path).select('ip','bundle').distinct()
+df = spark.read.format('parquet').load(path).select('ip','bundle').limit(100) # Add distinct later in EMR
 
 # Join app_description data and ip_addresses associated with these apps
 
@@ -38,14 +38,25 @@ joined_df = df.join(df_app, on='bundle', how='left').cache()
 
 # Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
 
-df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle like '%vpn%'" OR "app_name like '%vpn%'" OR "description like '%vpn%'")
+df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle like '%vpn%' OR app_name like '%vpn%' OR description like '%vpn%'")
 
 #Tokenize words in the description column to find how many times "vpn" occures
 # in the description
 
-df_v2 = df_v1.select('bundle',explode('description')).alias('word'))
-df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
-    .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
+
+df_app_desc_wc = df_app.withColumn('desc_word', F.explode(F.split(F.col('description'), ' '))).groupBy('desc_word','bundle').count().sort('count', ascending=False)
+df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('description'), ' '))).groupBy('name_word','bundle').count().sort('count', ascending=False)
+
+
+df_v2 = df_v1.join
+
+
+#df_v2 = df_v1.select('bundle',F.explode('description')).alias('word'))
+#df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
+#    .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
+
+
+#df_app.withColumn('word', F.explode(F.split(F.col('description'), ' '))).groupBy('word').count().sort('count', ascending=False)
 
 # Tokenize app names
 
