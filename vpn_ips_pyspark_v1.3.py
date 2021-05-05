@@ -43,7 +43,7 @@ joined_df = df.join(df_app, on='bundle', how='left').cache()
 
 # Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
 
-df_v1 = joined_df.select('ip','bundle','app_name','description').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
+df_v1 = joined_df.select('ip','bundle','name','des').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
 
 #Tokenize words in the description column to find how many times "vpn" occures
 # in the description
