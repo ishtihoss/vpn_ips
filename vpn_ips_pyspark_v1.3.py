@@ -10,7 +10,9 @@ from pyspark.sql.window import Window
 
 # Load data from app description folder
 
-df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bundle/segment/monthly/all/all/').select('app_name','bundle','description').limit(100)
+df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bundle/segment/monthly/all/all/')
+
+df_app = df_app.select('app_name','bundle','description')
 
 # Lowercasing app names and app descriptions
 
