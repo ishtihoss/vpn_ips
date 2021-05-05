@@ -53,7 +53,14 @@ df_app_desc_wc = df_app.withColumn('desc_word', F.explode(F.split(F.col('desc'),
 df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('name'), ' '))).filter("name_word == 'vpn'").groupBy('name_word','bundle').count().sort('count', ascending=False)
 
 
+## Adding tokenized words to data DataFrame
 
+df_v2 = df_v1.join(df_app_desc_wc,on='bundle',how ='left')
+df_v3 = dv_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
+
+## Write file
+
+df_v3.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household/')
 
 #df_v2 = df_v1.select('bundle',F.explode('description')).alias('word'))
 #df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
