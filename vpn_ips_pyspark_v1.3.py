@@ -35,7 +35,7 @@ df_app = df_app.withColumn("name",F.lower(F.col("app_name")))
 # Load data from the raw etl folder (MY 202101, Month of January, 2021)
 
 path = 's3a://ada-prod-data/etl/data/brq/raw/eskimi/daily/MY/202101*'
-df = spark.read.format('parquet').load(path).select('ip','bundle').limit(100) # Add distinct later in EMR
+df = spark.read.format('parquet').load(path).select('ip','bundle').distinct() # Add distinct later in EMR
 
 # Join app_description data and ip_addresses associated with these apps
 
@@ -43,7 +43,7 @@ joined_df = df.join(df_app, on='bundle', how='left').cache()
 
 # Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
 
-df_v1 = joined_df.select('ip','bundle','name','des').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
+df_v1 = joined_df.select('ip','bundle','name','desc').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
 
 #Tokenize words in the description column to find how many times "vpn" occures
 # in the description
@@ -56,7 +56,7 @@ df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('name'),
 ## Adding tokenized words to data DataFrame
 
 df_v2 = df_v1.join(df_app_desc_wc,on='bundle',how ='left')
-df_v3 = dv_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
+df_v3 = df_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
 
 ## Write file
 
