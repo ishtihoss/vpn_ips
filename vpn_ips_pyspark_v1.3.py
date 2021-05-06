@@ -12,7 +12,7 @@ from pyspark.sql.window import Window
 
 df_app = spark.read.format('parquet').load('s3a://ada-prod-data/etl/data/ref/bundle/segment/monthly/all/all/')
 
-df_app = df_app.select('app_name','bundle','description')
+df_app = df_app.select('app_name','bundle','description').cache()
 
 # Lowercasing app names and app descriptions
 
@@ -21,7 +21,7 @@ df_app = df_app.withColumn("name",F.lower(F.col("app_name")))
 
 # Isolating apps with vpn connections
 
-df_app = df_app.select('bundle','name','desc').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'")
+df_app = df_app.select('bundle','name','desc').where("bundle like '%vpn%' OR name like '%vpn%' OR desc like '%vpn%'").cache()
 
 
 # Count VPN appearance in app description
@@ -33,7 +33,7 @@ app_desc = df_app.filter(df_app['desc'].contains(df_app['vpn'])).groupBy('bundle
 app_desc = app_desc.withColumnRenamed('count','desc_count')
 app_name = df_app.filter(df_app['name'].contains(df_app['vpn'])).groupBy('bundle').count()
 app_name = app_name.withColumnRenamed('count','name_count')
-join_count = app_desc.join(app_name, on='bundle', how='left')
+join_count = app_desc.join(app_name, on='bundle', how='left').cache()
 
 
 # df_app.printSchema()
@@ -54,12 +54,12 @@ join_count = app_desc.join(app_name, on='bundle', how='left')
 # Load data from the raw etl folder (MY 202101, Month of January, 2021)
 
 path = 's3a://ada-prod-data/etl/data/brq/raw/eskimi/daily/MY/202101*'
-df = spark.read.format('parquet').load(path)
-df = df.select('ip','bundle').distinct() # Add distinct later in EMR
+df = spark.read.format('parquet').load(path).cache()
+df = df.select('ip','bundle').distinct().cache() # Add distinct later in EMR
 
 # Join app_description data and ip_addresses associated with these apps
 
-joined_df = df_app.join(df, on='bundle', how='left')
+joined_df = df_app.join(df, on='bundle', how='left').cache()
 
 # Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
 
@@ -77,14 +77,14 @@ joined_df = df_app.join(df, on='bundle', how='left')
 
 ## Adding tokenized words to data DataFrame
 
-df_vx = joined_df.join(join_count, on='bundle', how='left')
+df_vx = joined_df.join(join_count, on='bundle', how='left').cache()
 
 #df_v2 = df_v1.join(df_app_desc_wc,on='bundle',how ='left')
 #df_v3 = df_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
 
 ## Write file
 
-df_vx.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household_X4/')
+df_vx.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household_X10/')
 
 #df_v2 = df_v1.select('bundle',F.explode('description')).alias('word'))
 #df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
