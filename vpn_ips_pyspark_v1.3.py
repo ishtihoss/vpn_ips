@@ -6,7 +6,9 @@ import pyspark.sql.types as T
 from math import radians, cos, sin, asin, sqrt
 from pyspark.sql.functions import *
 from pyspark.sql.window import Window
-
+from pyspark.sql.functions import split, col, size, regexp_replace
+from pyspark.sql.types import *
+from pyspark.sql.functions import countDistinct
 
 # Load data from app description folder
 
@@ -26,14 +28,8 @@ df_app = df_app.select('bundle','name','desc').where("bundle like '%vpn%' OR nam
 
 # Count VPN appearance in app description
 
-df_app = df_app.withColumn('vpn', lit('vpn')) # lit is the string you want to detect
-
-
-app_desc = df_app.filter(df_app['desc'].contains(df_app['vpn'])).groupBy('bundle').count()
-app_desc = app_desc.withColumnRenamed('count','desc_count')
-app_name = df_app.filter(df_app['name'].contains(df_app['vpn'])).groupBy('bundle').count()
-app_name = app_name.withColumnRenamed('count','name_count')
-join_count = app_desc.join(app_name, on='bundle', how='left').cache()
+df_app = df_app.withColumn('desc_count', size(split(F.col('desc'), "vpn")) - 1)
+df_app = df_app.withColumn('name_count', size(split(F.col('name'), "vpn")) - 1)
 
 
 # df_app.printSchema()
@@ -51,52 +47,32 @@ join_count = app_desc.join(app_name, on='bundle', how='left').cache()
 # |    |    |-- genres: string (nullable = true)
 # |    |    |-- segment: string (nullable = true)
 
-# Load data from the raw etl folder (MY 202101, Month of January, 2021)
-
-path = 's3a://ada-prod-data/etl/data/brq/raw/eskimi/daily/MY/202101*'
-df = spark.read.format('parquet').load(path).cache()
-df = df.select('ip','bundle').distinct().cache() # Add distinct later in EMR
-
-# Join app_description data and ip_addresses associated with these apps
-
-joined_df = df_app.join(df, on='bundle', how='left').cache()
-
-# Filter vpn apps and associated ip addresses by string match on bundle OR app_name OR app app_description
+# Load data from the raw etl folder (ADA countries 202101, Month of January, 2021)
 
 
+#Create an empty dataframe
+
+#field = [StructField('ip', StringType(), True), StructField('bundle', StringType(), True), StructField('Country', StringType(), True)]
+#schema = StructType(field)
+#dfs = sqlContext.createDataFrame(sc.emptyRDD(), schema)
+
+#countries = ["SG","KR","KH","BD","LK","TH","ID","PH"]
+
+#countries = ["KR","LK"]
+#countries = ["TH"]
+#countries = ["SG","KH"]
+#countries = ["BD","ID","PH"]
+
+for i in countries:
+    path = 's3a://ada-prod-data/etl/data/brq/raw/eskimi/daily/{}/202101*'.format(i)
+    df = spark.read.format('parquet').load(path)
+    df = df.select('ip','bundle').distinct() # Add distinct later in EMR
+    df = df.withColumn('Country', lit(i))
+    joined_df = df_app.join(df, on='bundle', how='left') # Join app_description data and ip_addresses associated with these apps
+    joined_df.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household_c9c/{}'.format(i)) ## Write file
 
 
-
-#Tokenize words in the description column to find how many times "vpn" occures
-# in the description
-
-
-#df_app_desc_wc = df_app.withColumn('desc_word', F.explode(F.split(F.col('desc'), ' '))).filter("desc_word == 'vpn'").groupBy('desc_word','bundle').count().sort('count', ascending=False)
-#df_app_name_wc = df_app.withColumn('name_word', F.explode(F.split(F.col('name'), ' '))).filter("name_word == 'vpn'").groupBy('name_word','bundle').count().sort('count', ascending=False)
-
-
-## Adding tokenized words to data DataFrame
-
-df_vx = joined_df.join(join_count, on='bundle', how='left').cache()
-
-#df_v2 = df_v1.join(df_app_desc_wc,on='bundle',how ='left')
-#df_v3 = df_v1.join(df_app_name_wc, on = 'bundle', how = 'left')
-
-## Write file
-
-df_vx.write.format("parquet").option("compression", "snappy").save('s3a://ada-dev/ishti/vpn_household_X10/')
-
-#df_v2 = df_v1.select('bundle',F.explode('description')).alias('word'))
-#df_v3 = df_v2.select('bundle','word').filter("word == 'vpn'" OR "word == 'VPN'")\
-#    .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
-
-
-#df_app.withColumn('word', F.explode(F.split(F.col('description'), ' '))).groupBy('word').count().sort('count', ascending=False)
-
-# Tokenize app names
-
-
-
-
-# words(explode(col('words')).alias('word'))\
- #  .groupBy('word').count().orderBy('count',ascending=False).show(100, truncate=False)
+# Check count by Country
+path = 's3a://ada-dev/ishti/vpn_household_c9c/*'
+df = spark.read.parquet(path)
+df.groupBy("Country").agg(countDistinct("ip")).show(10)
