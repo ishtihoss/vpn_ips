@@ -59,7 +59,7 @@ df_app = df_app.withColumn('name_count', size(split(F.col('name'), "vpn")) - 1)
 #countries = ["SG","KR","KH","BD","LK","TH","ID","PH"]
 
 #countries = ["KR","LK"]
-#countries = ["TH"]
+countries = ["ID"]
 #countries = ["SG","KH"]
 #countries = ["BD","ID","PH"]
 
@@ -75,4 +75,9 @@ for i in countries:
 # Check count by Country
 path = 's3a://ada-dev/ishti/vpn_household_c9c/*'
 df = spark.read.parquet(path)
-df.groupBy("Country").agg(countDistinct("ip")).show(10)
+df.groupBy("Country").agg(countDistinct("ip")).orderBy(desc('count(DISTINCT ip)')).show(10)
+
+
+# Write coalesced data
+
+df.coalesce(4).write.format("parquet").option("compression", "snappy").save("s3a://ada-dev/ishti/master_r_vpn_parq")
